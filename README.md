@@ -1,22 +1,46 @@
+<div align="center">
+
 # dsh-skill-zh-overlay
 
-给 [dsh-skill-mcp-panel](https://github.com/Fishquito7/dsh-skill-mcp-panel) 的技能卡片加一块**中文说明浮层**。
+**给 [dsh-skill-mcp-panel](https://github.com/Fishquito7/dsh-skill-mcp-panel) 的技能卡片加一块中文说明浮层。**
 
-展开技能卡片时，最上方显示中文速览 + 分类标签 + 要点列表，下面才是面板原本的英文原文，做到中英对照。适合看不懂英文 description 的用户快速判断「这个技能是干什么的、什么时候该用」。
+展开技能卡片时，最上方显示中文速览 + 分类标签 + 要点列表，
+下面才是面板原本的英文原文，做到中英对照。
 
-```
-┌─ office-pptx ──────────────────────────  ● 已启用  ⌄ ┐
-│  ┌──────────────────────────────────────────────┐   │
-│  │ 中文说明   [Office · PPT]                     │   │
-│  │ 创建、读取、编辑、检查 PowerPoint 演示文稿…     │   │
-│  │  • PPTX 是输入或要交付时就该先加载它。          │   │
-│  │  • 默认用内置 Python 环境与随包演示库…          │   │
-│  │ ──────────────────────────────────────────── │   │
-│  │ EN · Create, read, edit, and check PowerPoint…│   │
-│  └──────────────────────────────────────────────┘   │
-│  Create, read, edit, and check PowerPoint… 来源: dsh-office │
-└─────────────────────────────────────────────────────┘
-```
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-dsh%20web-lightgrey)
+![Skills](https://img.shields.io/badge/skills-9%20%E6%94%B6%E5%BD%95-brightgreen)
+
+<img src="assets/panel-overview.png" width="420" alt="技能列表面板">
+
+</div>
+
+## 效果
+
+技能卡片展开后，中文说明渲染在英文原文上方：
+
+<div align="center">
+<img src="assets/card-zoom.png" width="595" alt="卡片展开后的中文说明浮层">
+</div>
+
+从上到下依次是：
+
+1. **「中文说明」徽章 + 分类标签**（如 `记忆·知识库`）
+2. **一句话中文简介** —— 这个技能干什么
+3. **要点列表** —— 什么时候该用它、有什么前提
+4. **一条分隔线**
+5. **`EN ·` 英文原文** —— 面板自己渲染的 `description`，原文保留不丢
+
+> 面板原本那行英文（`... 来源: dsh-office`）还在，在中文块下面，没有被删掉或替换。
+
+## 为什么做这个
+
+`dsh-skill-mcp-panel` 的技能卡片直接透传各 `SKILL.md` 里的 `description`，
+而这些描述几乎全是英文。像 `hindsight-coding-agent` 那种一段话讲完的长描述，
+英文读起来慢，读完还不一定记住「这东西什么时候会自己跳出来」。
+
+面板本身**没有任何 description 的中文字典**——它只负责把 frontmatter 原样贴出来。
+所以这里做了一层外挂的中文说明，把「这个技能是干什么的」压成一眼能扫的形式。
 
 ## 它由两半组成
 
@@ -27,10 +51,17 @@
 | **宿主插件** `dsh-skill-zh-overlay` | 作为 bundle 挂进 profile | 读映射表，往 `index.html` 注入 `window.__SKILL_ZH_MAP__` |
 | **前端补丁** `tools/patch.fragment.js` | 插进 `dsh-skill-mcp-panel/lib/client.js` 顶部 | 读那个全局常量，在卡片展开区渲染中文块 |
 
-为什么非要两半：`/plugins` 是 client-modules 的前缀路由，**未知路径一律 404**
-（`@deepseek-ai/dsh-client-modules/lib/index.js:977` 的 `bundleResource`，未知资源返回 `{status:404}`，见 `lib/index.js:990`），所以自定义 json 没法放在那里被前端 fetch 到。数据只能走宿主侧注入。
+为什么要拆成两半，各自的原因都挺硬的：
 
-前端补丁必须改 `client.js` 本体，是因为面板的前端束是**打包产物**，没有留给外部插件的渲染扩展点。
+**为什么数据走 index 注入，不走 HTTP 路由。**
+`/plugins` 是 client-modules 的前缀路由，**未知路径一律 404**
+（`@deepseek-ai/dsh-client-modules/lib/index.js:977` 的 `bundleResource`，
+未知资源返回 `{status:404}`，见 `lib/index.js:990`），
+所以自定义 json 放在那里前端根本 fetch 不到。
+
+**为什么必须改 `client.js` 本体。**
+面板的前端束是**打包产物**，没有留给外部插件的渲染扩展点。这不是偷懒，
+是当下唯一能插进去的位置。
 
 ## 仓库结构
 
@@ -38,13 +69,15 @@
 dsh-skill-zh-overlay/
 ├── package.json           插件清单（含 dsh.bundle.patch 指向 cordis.patch.yml）
 ├── cordis.patch.yml       插件自己的 loader patch：把自己 insert 进来
+├── install.ps1            一键安装的转发入口
 ├── lib/
 │   └── index.js           宿主侧：读映射表 → 注册 index 注入行
 ├── data/
 │   └── skill-zh-map.json  ★ 中文映射表，日常只改这个
-└── tools/
-    ├── apply.ps1          安装器（Windows / PowerShell）
-    └── patch.fragment.js  注入到面板 client.js 的那段装饰脚本
+├── tools/
+│   ├── apply.ps1          安装器（安装 / -Check / -Revert）
+│   └── patch.fragment.js  注入到面板 client.js 的那段装饰脚本
+└── assets/                README 用的截图
 ```
 
 ## 安装
@@ -55,7 +88,7 @@ dsh-skill-zh-overlay/
 ```powershell
 git clone https://github.com/blacktaoK/dsh-skill-zh-overlay.git
 cd dsh-skill-zh-overlay
-pwsh -NoProfile -File tools/apply.ps1
+pwsh -NoProfile -File install.ps1
 ```
 
 装完**重启 dsh**（插件登记需要重启才加载），然后刷新页面。
@@ -75,8 +108,8 @@ pwsh -NoProfile -File tools/apply.ps1
 其他命令：
 
 ```powershell
-pwsh -NoProfile -File tools/apply.ps1 -Check     # 看当前装了没有
-pwsh -NoProfile -File tools/apply.ps1 -Revert    # 完整还原
+pwsh -NoProfile -File install.ps1 -Check     # 看当前装了没有
+pwsh -NoProfile -File install.ps1 -Revert    # 完整还原
 ```
 
 ## 改中文说明
@@ -84,7 +117,7 @@ pwsh -NoProfile -File tools/apply.ps1 -Revert    # 完整还原
 只需要动 `data/skill-zh-map.json`，然后重跑安装器：
 
 ```powershell
-pwsh -NoProfile -File tools/apply.ps1
+pwsh -NoProfile -File install.ps1
 ```
 
 **不用重启 dsh，刷新页面即可**（映射表由宿主在每次渲染 index 时重新读）。
@@ -108,6 +141,20 @@ pwsh -NoProfile -File tools/apply.ps1
 
 卡片里显示「**暂无中文说明 —— 在 data/skill-zh-map.json 里给 "xxx" 加一条**」时，
 就说明这个技能还没收录，把 `xxx` 照抄成新的 key 即可。
+
+### 已收录
+
+| 技能 | 分类 |
+| --- | --- |
+| `archify` | 可视化 · 图表 |
+| `diagnose-windows-sandbox-acl` | 系统 · 排障 |
+| `generate-image` | 图像生成 |
+| `dsh-ppt` | Office · 演示 |
+| `hindsight-coding-agent` | 记忆 · 知识库 |
+| `office-docx` | Office · Word |
+| `office-pptx` | Office · PPT |
+| `office-xlsx` | Office · Excel |
+| `reverse-engineer-anything` | 逆向工程 |
 
 ## 原理
 
@@ -140,7 +187,7 @@ tools/patch.fragment.js（在面板 client.js 的 factory 里执行）
 
 ## 已知限制
 
-- **面板插件升级会覆盖 `client.js`**，补丁丢失、中文块消失。重跑 `apply.ps1` 恢复
+- **面板插件升级会覆盖 `client.js`**，补丁丢失、中文块消失。重跑 `install.ps1` 恢复
   （原始文件备份在 `lib/client.js.skvzh.bak`，`-Revert` 用它还原）。
 - 面板改版后 `data-skill-name` / `.SKV_cardDetails` / `.SKV_meta` 这些锚点可能变，
   补丁会静默失效（整体包在 try/catch 里，不影响面板本身）。届时对着新版 `client.js`
