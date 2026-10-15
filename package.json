@@ -1,0 +1,43 @@
+{
+  "name": "dsh-skill-zh-overlay",
+  "version": "1.0.0",
+  "description": "给 dsh-skill-mcp-panel 的技能卡片注入中文说明浮层：读一份「技能名 → 中文说明」映射表，在卡片展开区顶部渲染中文速览 + 要点，中英对照。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "skills",
+    "skill",
+    "i18n",
+    "chinese",
+    "dsh-skill-mcp-panel"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blacktaoK/dsh-skill-zh-overlay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/blacktaoK/dsh-skill-zh-overlay/issues"
+  },
+  "homepage": "https://github.com/blacktaoK/dsh-skill-zh-overlay#readme",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "data",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ]
+}
