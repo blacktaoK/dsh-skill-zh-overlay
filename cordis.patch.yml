@@ -1,9 +1,10 @@
 # dsh-skill-zh-overlay 的 bundle patch。
 #
 # 这个文件由 loader 在插件被列入 profile 的 `dsh.profile.bundles` 时加载，
-# 作用只有一个：把插件自己挂上。插件本体向 index.html 注入
-# `window.__SKILL_ZH_MAP__`（技能名 → 中文说明），客户端装饰脚本
-# （由 tools/apply.ps1 注入到 dsh-skill-mcp-panel/lib/client.js）读它渲染中文浮层。
+# 作用只有一个：把插件自己挂上。插件本体做三件事：
+#   1. 向 index.html 注入 `window.__SKILL_ZH_MAP__`（技能名 → 中文说明）；
+#   2. 开 /skill-zh-overlay/api 路由，浏览器按需请求时用当前默认模型现场生成；
+#   3. 给 dsh-skill-mcp-panel/lib/client.js 打上装饰脚本，由它渲染中文浮层。
 #
 # 启用 / 停用这个插件 = 在 profile 的 `dsh.profile.bundles` 里加减
 # `dsh-skill-zh-overlay`，由插件市场的开关直接操作，不需要手工编辑本文件。

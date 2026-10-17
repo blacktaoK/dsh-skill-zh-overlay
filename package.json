@@ -1,7 +1,7 @@
 {
   "name": "dsh-skill-zh-overlay",
-  "version": "1.1.1",
-  "description": "给 dsh-skill-mcp-panel 的技能卡片加一块中文说明：9 个英文技能已收录，一句话速览 + 分类标签 + 要点列表。原文是中文的技能自动跳过，没收录的不占位置，面板原本的英文原文折进「原文」按钮。",
+  "version": "1.2.0",
+  "description": "给 dsh-skill-mcp-panel 的技能卡片加一块中文说明。没收录的英文技能由宿主调用当前默认模型现场生成并缓存（按原文 sha1 失效），原文是中文的自动跳过，面板原本的英文原文折进「原文」按钮。装完即用，不必逐条手写映射。",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -10,7 +10,9 @@
     "skill",
     "i18n",
     "chinese",
-    "dsh-skill-mcp-panel"
+    "dsh-skill-mcp-panel",
+    "translation",
+    "llm"
   ],
   "license": "MIT",
   "author": "",
@@ -42,6 +44,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test/test-installer.mjs",
+    "test": "node test/test-installer.mjs && node test/test-auto.mjs",
+    "test:installer": "node test/test-installer.mjs",
+    "test:auto": "node test/test-auto.mjs",
     "smoke": "node test/smoke.mjs"
   }}

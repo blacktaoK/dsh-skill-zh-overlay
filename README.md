@@ -7,9 +7,11 @@
 展开技能卡片时，最上方显示中文速览 + 分类标签 + 要点列表；
 面板原本那行英文原文自动折起，点「原文」再展开。
 
+**没收录的技能不用管** —— 第一次点开时由你当前的默认模型现场写一条，写完全局缓存。
+
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-dsh%20web-lightgrey)
-![Skills](https://img.shields.io/badge/skills-9%20%E6%94%B6%E5%BD%95-brightgreen)
+![Auto](https://img.shields.io/badge/%E8%87%AA%E5%8A%A8%E7%94%9F%E6%88%90-%E6%97%A0%E9%9C%80%E6%94%B6%E5%BD%95-brightgreen)
 ![Install](https://img.shields.io/badge/dsh%20plugin%20add-%E5%8D%B3%E5%8F%AF-brightgreen)
 
 <img src="assets/panel-overview.png" width="420" alt="技能列表截图：dsh-skill-mcp-panel 的技能列表面板">
@@ -32,12 +34,41 @@
 4. **一条分隔线**
 5. **来源 + 「原文」小按钮 + 「原文已折叠」提示** —— 原文不删，默认折起，点一下展开
 
-三条原则：
+四条原则：
 
 - **不重复英文。** 面板下一行本来就写着原文，浮层不再抄一遍。
 - **原文是中文的不加浮层。** `work-report-writer` 这类技能的描述本来就是中文，
   再叠一层中文只是把同一句话摆两遍，装饰脚本会按中文占比自动跳过。
-- **没收录的什么都不加。** 不占位置、不显示「暂无说明」。
+- **没收录的不占位置。** 不会塞一行「暂无中文说明」的占位框糊弄过去 ——
+  要么真的生成一条，要么什么都不加。
+- **没收录但需要中文时，现生成。** 见下一节。
+
+## 中文说明从哪来
+
+一个技能要显示中文，按这个顺序取，**取到就停**：
+
+| 顺序 | 来源 | 谁写的 |
+| --- | --- | --- |
+| 1 | `data/skill-zh-map.json` | 人工手写，校对过，优先最高 |
+| 2 | `data/auto-zh.json` | 上一次自动生成后落盘的缓存 |
+| 3 | 本次进程内已生成的 | 缓存 |
+| 4 | **现场调用模型生成** | 宿主，用你当前的默认模型 |
+
+第 4 步的触发方式很朴素：**你点开一张没有中文的卡片**，装饰脚本先放一个
+「正在生成中文说明…」的占位块，同时把这条丢进请求队列，攒成一批（最多 8 条）
+POST 到 `/skill-zh-overlay/api/explain`。宿主拿到后调用默认模型，要求它输出
+`{zh, tag, bullets}` 三个字段的 JSON，写进 `data/auto-zh.json`，再把结果并回前端
+的那张表 —— 占位块当场换成真正的中文，不用刷新页面。
+
+实测一次生成 **约 2 秒**，命中缓存后 **约 0.1 秒**。
+
+**缓存怎么失效。** 每条缓存都记着当时英文原文的 `sha1` 前 16 位；技能描述的英文一改
+（比如面板作者升级了 `SKILL.md`），指纹对不上，旧译文自动作废，下次点开重新生成。
+不会把过期的中文贴到新内容上。
+
+**手写永远压过自动。** 模型不可能比校对过的措辞更准，所以 `skill-zh-map.json` 里有
+条目就用条目，自动生成的同名词条会被忽略。想让某个技能强制不加浮层，就在手写表里
+写 `"noOverlay": true`。
 
 ## 安装
 
@@ -89,14 +120,17 @@ pwsh -NoProfile -File install.ps1 -Revert    # 完整还原（含撤掉前端补
 面板本身**没有任何 description 的中文字典**——它只负责把 frontmatter 原样贴出来。
 所以这里做了一层外挂的中文说明，把「这个技能是干什么的」压成一眼能扫的形式。
 
+一开始的做法是纯手写映射表，但那样每装一个新技能就得回去补一条，很烦。
+现在改成**手写兜底 + 按需生成**：常用技能留手写版保证措辞，其余全交给模型。
+
 ## 它由两半组成
 
 这个功能不是单个文件，而是**一个宿主插件 + 一处前端补丁**：
 
 | 组成 | 位置 | 干什么 |
 | --- | --- | --- |
-| **宿主插件** `dsh-skill-zh-overlay` | 作为 bundle 挂进 profile | ① 读映射表注入 `window.__SKILL_ZH_MAP__`；② 启动时给面板 `client.js` 装装饰脚本 |
-| **前端补丁** `lib/patch.fragment.js` | 由插件自动插进 `dsh-skill-mcp-panel/lib/client.js` | 读那个全局常量，在卡片展开区渲染中文块 |
+| **宿主插件** `dsh-skill-zh-overlay` | 作为 bundle 挂进 profile | ① 合并映射表与缓存，注入 `window.__SKILL_ZH_MAP__`；② 启动时给面板 `client.js` 装装饰脚本；③ 开 `/skill-zh-overlay/api/explain` 按需生成 |
+| **前端补丁** `lib/patch.fragment.js` | 由插件自动插进 `dsh-skill-mcp-panel/lib/client.js` | 读那个全局常量，在卡片展开区渲染中文块；缺条目时请求宿主现场生成 |
 
 为什么要拆成两半，各自的原因都挺硬的：
 
@@ -111,6 +145,11 @@ pwsh -NoProfile -File install.ps1 -Revert    # 完整还原（含撤掉前端补
 未知资源返回 `{status:404}`，见 `lib/index.js:990`），
 所以自定义 json 放在那里前端根本 fetch 不到。
 
+**为什么自动生成走自己的 HTTP 前缀，不用 Typert。**
+Typert 的一元方法虽然也走 `POST /api/<ns>/<method>`，但路由前缀归 dsh 所有。
+本插件挂在 `/skill-zh-overlay/api` 下，与 dsh 版本、网关 schema 演进完全解耦，
+也不占用别人的命名空间。
+
 ## 仓库结构
 
 ```
@@ -119,22 +158,28 @@ dsh-skill-zh-overlay/
 ├── cordis.patch.yml       插件自己的 loader patch：把自己 insert 进来
 ├── install.ps1            从源码安装的转发入口
 ├── lib/
-│   ├── index.js           宿主侧：读映射表 → 注册 index 注入行 → 启动时补面板
+│   ├── index.js           宿主侧：合并映射 → 注入 index → 注册生成接口 → 启动时补面板
 │   ├── installer.js       前端补丁的安装/还原实现（幂等、带备份、语法自检）
 │   └── patch.fragment.js  注入到面板 client.js 的那段装饰脚本
 ├── data/
-│   └── skill-zh-map.json  ★ 中文映射表，日常只改这个
+│   ├── skill-zh-map.json  ★ 手写映射表（可选，覆盖自动生成）
+│   └── auto-zh.json       自动生成缓存（首次生成后自动出现）
 ├── tools/
 │   └── apply.ps1          从源码装的安装器（安装 / -Check / -Revert）
 ├── test/
 │   ├── test-installer.mjs 30 条隔离单测（不碰真机）
+│   ├── test-auto.mjs      21 条纯函数单测（指纹、中文判定、JSON 容错、合并优先级）
 │   └── smoke.mjs          真机冒烟：确认装饰脚本确实进了面板束
 └── assets/                README 用的截图
 ```
 
 ## 改中文说明
 
-只需要动 `data/skill-zh-map.json`，然后**重启 dsh**（映射表在插件启动时读一次）。
+**一般不用改。** 没收录的技能会自动生成。只有两种情况需要动手写手写表：
+想长期固定某个技能的措辞，或者想关掉它的浮层。
+
+手写表在 `data/skill-zh-map.json`，改完**重启 dsh**（启动时读一次）。
+自动缓存 `data/auto-zh.json` 反过来是热生效的，删掉某条重启就重新生成。
 
 ### 映射表格式
 
@@ -153,18 +198,17 @@ dsh-skill-zh-overlay/
 
 `技能名` 必须和卡片上的技能名完全一致（也是面板写在 DOM 上的 `data-skill-name`）。
 
-**没收录的不会报错，也不会显示「暂无中文说明」** —— 就是不加，卡片保持面板原样。
-原文本身已经是中文的技能，就算写进映射表也会被跳过（中文字符占比 ≥ 30% 即判定为中文原文）。
+原文本身已经是中文的技能，就算写进映射表也会被跳过
+（中文字符占非空白字符 **≥ 30%** 即判定为中文原文；宿主和前端用的是同一个判据）。
 
-### 已收录
+### 现在手写了哪些
 
-只收录**原文是英文**的技能（共 9 个）：
+**8 个英文技能**，都是措辞想固定下来的：
 
 | 技能 | 分类 |
 | --- | --- |
 | `archify` | 可视化 · 图表 |
 | `diagnose-windows-sandbox-acl` | 系统 · 排障 |
-| `dsh-ppt` | Office · 演示 |
 | `generate-image` | 图像生成 |
 | `hindsight-coding-agent` | 记忆 · 知识库 |
 | `office-docx` | Office · Word |
@@ -172,21 +216,26 @@ dsh-skill-zh-overlay/
 | `office-xlsx` | Office · Excel |
 | `reverse-engineer-anything` | 逆向工程 |
 
-原文本来就是中文的 7 个（`data-viz-gen`、`dataset-health-audit`、`gov-doc-writing`、
-`meeting-recap`、`research-writer`、`saas-metrics-coach`、`work-report-writer`）
-**故意不写进映射表** —— 写了也会被跳过，不如不写，免得后来的人以为漏了。
+其余技能（含 `data-viz-gen`、`gov-doc-writing`、`meeting-recap`、`work-report-writer`
+这些原文本来就是中文的）**不再占用映射表**，各走各的路：中文原文自动跳过，
+没写过的英文技能第一次点开时自动生成。
 
 ## 原理
 
 ```
-宿主插件 lib/index.js（apply 时做两件事）
+宿主插件 lib/index.js（apply 时做三件事）
    │
    ├─ ① 注册 webserver/index-inject 回调
    │     <profile> 渲染 index.html 时推入一行
-   │     { kind: 'global', name: '__SKILL_ZH_MAP__', value: {...} }
+   │     { kind: 'global', name: '__SKILL_ZH_MAP__', value: 手写+缓存 }
    │     → <head><script>globalThis["__SKILL_ZH_MAP__"] = {...}</script></head>
    │
-   └─ ② 找 dsh-skill-mcp-panel 的 lib/client.js，把装饰脚本写进去
+   ├─ ② 注册 prefix 路由 /skill-zh-overlay/api
+   │     POST /explain {skills:[{name,description}]}
+   │       → 手写命中？用。缓存命中？用。都没有 → ctx.llm.stream 现场生成
+   │       → 写回 data/auto-zh.json → 返回 {entries, missing}
+   │
+   └─ ③ 找 dsh-skill-mcp-panel 的 lib/client.js，把装饰脚本写进去
          （幂等：已装就跳过；改过就先还原再重打）
             │
             ▼
@@ -194,16 +243,23 @@ lib/patch.fragment.js（在面板 client.js 的 factory 里执行）
    │  MutationObserver 盯 [data-skill-name] 卡片
    │  找到展开区 .SKV_cardDetails 里的 p.SKV_meta（面板渲染的原文行）
    ▼
-① 原文是中文 / 没收录 → 什么都不做
-② 否则：中文块 insertBefore 到原文行前面，再把原文行折成
-   「来源: xxx + 原文按钮」，点按钮展开
+① 原文是中文 → 什么都不做
+② 表里有条目 → 中文块 insertBefore 到原文行前面
+③ 表里没条目 → 放「正在生成中文说明…」占位，丢进队列 POST 给宿主；
+   拿到结果并进表里，下一轮 decorate 就换成真正的中文块
+④ 无论哪条路，最后都把原文行折成「来源: xxx + 原文按钮」，点按钮展开
 ```
 
-**第 ② 步怎么找到面板。** 插件是 junction 安装的，Node 解析模块时给的是
+**第 ③ 步怎么找到面板。** 插件是 junction 安装的，Node 解析模块时给的是
 **真实路径**（落在 `profiles/.generations/<gen>/node_modules/...`），而面板装在
 `profiles/<profile>/node_modules/`。所以 `lib/installer.js` 从自身真实路径**往上走
 到 `profiles/`**，再把它的每个子目录下的 `node_modules/dsh-skill-mcp-panel/...`
 全列出来当候选 —— 这样无论插件在哪个 generation、哪个 profile 都能找到面板。
+
+**模型输出怎么保证可解析。** 系统提示强制「只输出 JSON，不要 Markdown 代码块」，
+解析端仍然容错 ` ```json ` 围栏和前后多嘴的解释；实在解析不出就整条丢弃
+（`missing` 数组里会带上技能名），下次点开再试，绝不把半截文本塞进卡片。
+单次请求 `maxTokens: 700`、超时 60 秒、一批最多 8 条。
 
 关键锚点（面板 v2.1.5）：
 
@@ -215,21 +271,37 @@ lib/patch.fragment.js（在面板 client.js 的 factory 里执行）
 `.SKV_cardDetails` 整个销毁；点回来会重建，补丁靠 `MutationObserver`
 + 点击后补跑（50/150/400ms）重新插入，所以来回切也不会丢。
 
+## 配置
+
+插件配置（`cordis.patch.yml` 里 `config` 段，都可省略）：
+
+```yaml
+provider: ''        # 留空 = 用你当前的默认模型
+model: ''           # 同上
+autoGenerate: true  # false = 关掉按需生成，只用手写映射
+```
+
+关掉 `autoGenerate` 后，没写进 `skill-zh-map.json` 的技能就没有中文块 —— 卡片保持面板原样。
+
 ## 本地自测
 
 ```powershell
 node test/test-installer.mjs   # 30 条隔离单测，在临时目录里演练，不碰真机
+node test/test-auto.mjs        # 21 条纯函数单测
 node test/smoke.mjs            # 真机冒烟：装饰脚本是否确实进了面板束
 ```
 
 `test-installer.mjs` 覆盖：锚点定位、幂等、重复安装不叠加、`-Revert` 还原、
 面板升级后锚点缺失时不写坏文件、越界保护等。
 
+`test-auto.mjs` 覆盖：指纹稳定性、中文判定（含「恰好三成」的边界）、
+模型输出解析（裸 JSON / 代码围栏 / 前后有废话 / 坏 JSON）、合并优先级（手写压自动）。
+
 它需要一份「未打过补丁」的前端束当载荷，按这个顺序找：
 
 1. 本机面板的 `lib/client.js.skvzh.bak`（首次注入前的备份）
 2. 本机面板的 `lib/client.js`（没有备份 = 从未注入过）
-3. 都拿不到就用**内置的最小桩**（只保留真实锚点行，215 字节）
+3. 都拿不到就用**内置的最小桩**（只保留真实锚点行）
 
 所以测试在没装面板的机器上也能跑，不用把一个 200KB 的上游产物固化进仓库。
 面板装在非默认 profile 时，用 `DSH_PROFILE_DIR` 指过去。
@@ -237,13 +309,14 @@ node test/smoke.mjs            # 真机冒烟：装饰脚本是否确实进了�
 ## 已知限制
 
 - **面板插件升级会覆盖 `client.js`**，补丁丢失、中文块消失。
-  重跑一次插件（或重启 dsh）就会自动补回；原始文件备份在
-  `lib/client.js.skvzh.bak`，`-Revert` 用它还原。
+  重启 dsh 就会自动补回（`apply` 里每次都调 `ensurePatched`）；
+  原始文件备份在 `lib/client.js.skvzh.bak`，`-Revert` 用它还原。
+- **按需生成要花模型调用。** 每个新技能第一次点开生成一次，之后走缓存不花钱。
+  不想花就关掉 `autoGenerate`，或者把它写进手写表。
+- 生成质量取决于当前默认模型；写错的话改手写表覆盖它。
 - 面板改版后 `data-skill-name` / `.SKV_cardDetails` / `.SKV_meta` 这些锚点可能变，
   补丁会静默失效（整体包在 try/catch 里，不影响面板本身）。届时对着新版 `client.js`
   调整 `lib/patch.fragment.js` 里的选择器。
-- 映射表要**手工维护**，不会自动翻译：`SKILL.md` 里的 description 是英文的，
-  没有本地翻译环节。
 - 「原文」按钮折叠的是**面板自己的**那行描述文字，只改显示不改数据；
   React 重建子树后会重新装饰，装饰时按 `data-skvzh-open` 对齐按钮文案，
   不会把你手动展开的原文又收回去。
