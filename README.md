@@ -9,7 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-dsh%20web-lightgrey)
-![Skills](https://img.shields.io/badge/skills-16%20%E6%94%B6%E5%BD%95-brightgreen)
+![Skills](https://img.shields.io/badge/skills-9%20%E6%94%B6%E5%BD%95-brightgreen)
 ![Install](https://img.shields.io/badge/dsh%20plugin%20add-%E5%8D%B3%E5%8F%AF-brightgreen)
 
 <img src="assets/panel-overview.png" width="420" alt="技能列表截图：dsh-skill-mcp-panel 的技能列表面板">
@@ -26,11 +26,11 @@
 
 从上到下依次是：
 
-1. **「中文说明」徽章 + 分类标签**（如 `记忆·知识库`）
+1. **「中文说明」徽章 + 分类标签**（如 `可视化 · 图表`）
 2. **一句话中文简介** —— 这个技能干什么
 3. **要点列表** —— 什么时候该用它、有什么坑
 4. **一条分隔线**
-5. **来源 + 「原文」小按钮** —— 原文不删，默认折起，点一下展开
+5. **来源 + 「原文」小按钮 + 「原文已折叠」提示** —— 原文不删，默认折起，点一下展开
 
 三条原则：
 
@@ -158,24 +158,23 @@ dsh-skill-zh-overlay/
 
 ### 已收录
 
+只收录**原文是英文**的技能（共 9 个）：
+
 | 技能 | 分类 |
 | --- | --- |
 | `archify` | 可视化 · 图表 |
-| `data-viz-gen` | 数据 · 图表 |
-| `dataset-health-audit` | 数据 · 质检 |
 | `diagnose-windows-sandbox-acl` | 系统 · 排障 |
 | `dsh-ppt` | Office · 演示 |
 | `generate-image` | 图像生成 |
-| `gov-doc-writing` | 写作 · 公文 |
 | `hindsight-coding-agent` | 记忆 · 知识库 |
-| `meeting-recap` | 写作 · 会议 |
 | `office-docx` | Office · Word |
 | `office-pptx` | Office · PPT |
 | `office-xlsx` | Office · Excel |
-| `research-writer` | 写作 · 研究 |
 | `reverse-engineer-anything` | 逆向工程 |
-| `saas-metrics-coach` | 经营 · 指标 |
-| `work-report-writer` | 写作 · 汇报 |
+
+原文本来就是中文的 7 个（`data-viz-gen`、`dataset-health-audit`、`gov-doc-writing`、
+`meeting-recap`、`research-writer`、`saas-metrics-coach`、`work-report-writer`）
+**故意不写进映射表** —— 写了也会被跳过，不如不写，免得后来的人以为漏了。
 
 ## 原理
 
@@ -246,7 +245,10 @@ node test/smoke.mjs            # 真机冒烟：装饰脚本是否确实进了�
 - 映射表要**手工维护**，不会自动翻译：`SKILL.md` 里的 description 是英文的，
   没有本地翻译环节。
 - 「原文」按钮折叠的是**面板自己的**那行描述文字，只改显示不改数据；
-  React 重建子树后会重新装饰。
+  React 重建子树后会重新装饰，装饰时按 `data-skvzh-open` 对齐按钮文案，
+  不会把你手动展开的原文又收回去。
+- 卡片是手风琴，点另一张会把当前这张折叠、`.SKV_cardDetails` 整个销毁；
+  再点回来时补丁会重新插入，中文块和「原文」按钮都会回来。
 - 位置靠后的「来源: dsh-office」是面板自己渲染的，不属于本项目。
 
 ## License
