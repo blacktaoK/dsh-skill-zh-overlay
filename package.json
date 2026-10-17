@@ -1,7 +1,7 @@
 {
   "name": "dsh-skill-zh-overlay",
-  "version": "1.0.0",
-  "description": "给 dsh-skill-mcp-panel 的技能卡片注入中文说明浮层：读一份「技能名 → 中文说明」映射表，在卡片展开区顶部渲染中文速览 + 要点，中英对照。",
+  "version": "1.1.0",
+  "description": "给 dsh-skill-mcp-panel 的技能卡片加一块中文说明：16 个技能已收录，一句话速览 + 分类标签 + 要点列表。原文是中文的技能自动跳过，没收录的不占位置，面板原本的英文原文折进「原文」按钮。",
   "keywords": [
     "dsh",
     "dsh-plugin",

@@ -4,35 +4,40 @@
 
 **给 [dsh-skill-mcp-panel](https://github.com/Fishquito7/dsh-skill-mcp-panel) 的技能卡片加一块中文说明浮层。**
 
-展开技能卡片时，最上方显示中文速览 + 分类标签 + 要点列表，
-下面才是面板原本的英文原文，做到中英对照。
+展开技能卡片时，最上方显示中文速览 + 分类标签 + 要点列表；
+面板原本那行英文原文自动折起，点「原文」再展开。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-dsh%20web-lightgrey)
-![Skills](https://img.shields.io/badge/skills-9%20%E6%94%B6%E5%BD%95-brightgreen)
+![Skills](https://img.shields.io/badge/skills-16%20%E6%94%B6%E5%BD%95-brightgreen)
 ![Install](https://img.shields.io/badge/dsh%20plugin%20add-%E5%8D%B3%E5%8F%AF-brightgreen)
 
-<img src="assets/panel-overview.png" width="420" alt="技能列表面板">
+<img src="assets/panel-overview.png" width="420" alt="技能列表截图：dsh-skill-mcp-panel 的技能列表面板">
 
 </div>
 
 ## 效果
 
-技能卡片展开后，中文说明渲染在英文原文上方：
+技能卡片展开后，中文说明渲染在原文上方：
 
 <div align="center">
-<img src="assets/card-zoom.png" width="595" alt="卡片展开后的中文说明浮层">
+<img src="assets/card-zoom.png" width="595" alt="技能卡片展开后的中文说明浮层截图">
 </div>
 
 从上到下依次是：
 
 1. **「中文说明」徽章 + 分类标签**（如 `记忆·知识库`）
 2. **一句话中文简介** —— 这个技能干什么
-3. **要点列表** —— 什么时候该用它、有什么前提
+3. **要点列表** —— 什么时候该用它、有什么坑
 4. **一条分隔线**
-5. **`EN ·` 英文原文** —— 面板自己渲染的 `description`，原文保留不丢
+5. **来源 + 「原文」小按钮** —— 原文不删，默认折起，点一下展开
 
-> 面板原本那行英文（`... 来源: dsh-office`）还在，在中文块下面，没有被删掉或替换。
+三条原则：
+
+- **不重复英文。** 面板下一行本来就写着原文，浮层不再抄一遍。
+- **原文是中文的不加浮层。** `work-report-writer` 这类技能的描述本来就是中文，
+  再叠一层中文只是把同一句话摆两遍，装饰脚本会按中文占比自动跳过。
+- **没收录的什么都不加。** 不占位置、不显示「暂无说明」。
 
 ## 安装
 
@@ -141,29 +146,36 @@ dsh-skill-zh-overlay/
     "zh": "一句话中文简介，显示在卡片展开区最上方。",
     "tag": "分类标签，显示为小徽章",
     "bullets": ["要点一", "要点二（2-4 条，讲清什么时候用 / 有什么坑）"],
-    "en": "可选；填了就固定显示这段英文，不填则用 SKILL.md 里真实的 description"
+    "noOverlay": "可选；true = 强制不加浮层"
   }
 }
 ```
 
 `技能名` 必须和卡片上的技能名完全一致（也是面板写在 DOM 上的 `data-skill-name`）。
 
-卡片里显示「**暂无中文说明 —— 在 data/skill-zh-map.json 里给 "xxx" 加一条**」时，
-就说明这个技能还没收录，把 `xxx` 照抄成新的 key 即可。
+**没收录的不会报错，也不会显示「暂无中文说明」** —— 就是不加，卡片保持面板原样。
+原文本身已经是中文的技能，就算写进映射表也会被跳过（中文字符占比 ≥ 30% 即判定为中文原文）。
 
 ### 已收录
 
 | 技能 | 分类 |
 | --- | --- |
 | `archify` | 可视化 · 图表 |
+| `data-viz-gen` | 数据 · 图表 |
+| `dataset-health-audit` | 数据 · 质检 |
 | `diagnose-windows-sandbox-acl` | 系统 · 排障 |
-| `generate-image` | 图像生成 |
 | `dsh-ppt` | Office · 演示 |
+| `generate-image` | 图像生成 |
+| `gov-doc-writing` | 写作 · 公文 |
 | `hindsight-coding-agent` | 记忆 · 知识库 |
+| `meeting-recap` | 写作 · 会议 |
 | `office-docx` | Office · Word |
 | `office-pptx` | Office · PPT |
 | `office-xlsx` | Office · Excel |
+| `research-writer` | 写作 · 研究 |
 | `reverse-engineer-anything` | 逆向工程 |
+| `saas-metrics-coach` | 经营 · 指标 |
+| `work-report-writer` | 写作 · 汇报 |
 
 ## 原理
 
@@ -181,9 +193,11 @@ dsh-skill-zh-overlay/
             ▼
 lib/patch.fragment.js（在面板 client.js 的 factory 里执行）
    │  MutationObserver 盯 [data-skill-name] 卡片
-   │  找到展开区 .SKV_cardDetails 里的 p.SKV_meta（面板渲染的英文原文行）
+   │  找到展开区 .SKV_cardDetails 里的 p.SKV_meta（面板渲染的原文行）
    ▼
-把中文块 insertBefore 到那一行前面
+① 原文是中文 / 没收录 → 什么都不做
+② 否则：中文块 insertBefore 到原文行前面，再把原文行折成
+   「来源: xxx + 原文按钮」，点按钮展开
 ```
 
 **第 ② 步怎么找到面板。** 插件是 junction 安装的，Node 解析模块时给的是
@@ -231,6 +245,8 @@ node test/smoke.mjs            # 真机冒烟：装饰脚本是否确实进了�
   调整 `lib/patch.fragment.js` 里的选择器。
 - 映射表要**手工维护**，不会自动翻译：`SKILL.md` 里的 description 是英文的，
   没有本地翻译环节。
+- 「原文」按钮折叠的是**面板自己的**那行描述文字，只改显示不改数据；
+  React 重建子树后会重新装饰。
 - 位置靠后的「来源: dsh-office」是面板自己渲染的，不属于本项目。
 
 ## License
