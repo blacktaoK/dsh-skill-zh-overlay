@@ -37,6 +37,7 @@
     "lib",
     "data",
     "cordis.patch.yml",
+    "screenshots.json",
     "README.md",
     "LICENSE"
   ],
